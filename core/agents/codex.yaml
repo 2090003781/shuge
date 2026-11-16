@@ -1,0 +1,43 @@
+# Codex CLI —— agent 接入描述（**目前只被识别到，还没接**）
+#
+# 路径不写死：`{{pyw}}` = 本机不弹黑窗的 python，`{{core}}` = 本平台装在哪
+# （写进你的配置时由 scripts/agentctl.py 按**本机识别结果**填；2026-10-06 辞玖定）
+id: codex
+name: Codex CLI
+agent_id: agent.codex
+plugin_id: plugin.codex
+
+detect:
+  paths: ["~/.codex"]
+  files: ["~/.codex/config.toml"]
+  exes: ["codex"]
+
+interface:
+  status_tool: codex.status
+  inbox: data/inbox/codex
+  record: data/transcripts/agent.codex
+  capabilities: [agent.bridge, chat, reasoning, tool-use]
+  agent_capabilities: [chat, reasoning, tool-use]
+  description: "Codex CLI 接入通道：MCP 面给它软件操作。"
+
+mcp:                                     # Codex 的 MCP 写在 config.toml 的 [mcp_servers.<name>]
+  kind: codex-toml
+  server_name: brain
+  transport: stdio
+  command: "{{pyw}}"
+  args: ["{{core}}/plugins/agent_plugin.py", "--agent", "codex", "--mcp"]
+  cwd: "{{core}}"
+  config: "~/.codex/config.toml"
+  entry_id: "mcp_servers.brain"
+
+hook:
+  kind: none                             # 它有 notify（turn-ended）可挂，但那是命令行不是 stdin 事件；先不接
+
+source:
+  events: none                           # 事件源待定（它有 notify 钩子）
+  transcript: session-store              # 会话在 ~/.codex/sessions/**.jsonl（适配器还没写）
+  adapter: ""
+  path: "~/.codex/sessions"
+
+notes:
+  - "codex 的 notify 在 config.toml 里现指向一个 cua_node 可执行；接它要写一个包装器，先不动。"

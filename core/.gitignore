@@ -1,0 +1,29 @@
+bin/
+*.exe
+web/node_modules/
+.DS_Store
+config.yaml
+data/inbox/
+data/logs/
+data/plugins/
+__pycache__/
+*.pyc
+data/context/
+data/ledger/
+data/health/
+# 本机运行状态（2026-09-21 补：这些是每台机器各不相同的运行时文件，不该入库）
+data/*.log
+data/*.port
+data/owner.json
+data/host-cache.json
+data/backup-config/
+data/backup-tasks/
+data/inbox-state.json
+
+# agentctl / 运维脚本留的现场备份（改 config.yaml、插件条目时自动生成）
+config.yaml.bak-*
+# 2026-10-06：**整个 data/ 一律不进版本库**
+# 起因：我在改名提交时用了 git add -A，把 data/tmp/ 与 data/transcripts/（会话转写，含私密内容）
+# 一起暂存了 —— 差点把运行时数据提交进去。下面那些细分条目仍在，但这行是兜底。
+# 注意：data/ 下当前没有任何被跟踪的文件（git ls-files data 为空），所以整目录忽略是安全的。
+data/

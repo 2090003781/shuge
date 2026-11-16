@@ -1,0 +1,57 @@
+# DSH（DeepSeek Harness）—— agent 接入描述（模板见 templates/agent/README.md）
+#
+# 路径不写死：`{{pyw}}` = 本机不弹黑窗的 python，`{{core}}` = 本平台装在哪
+# （写进你的配置时由 scripts/agentctl.py 按**本机识别结果**填；2026-10-06 辞玖定）
+id: dsh
+name: DSH（DeepSeek Harness）
+agent_id: agent.dsh
+plugin_id: plugin.dsh
+
+detect:                                  # 自动识别：任一命中 = 这台机器装了它
+  paths: ["~/.dsh"]
+  files: ["~/.dsh/profiles/web/cordis.patch.yml"]
+  exes: []
+
+interface:                               # 内核侧接口（生成 config.yaml 条目）
+  status_tool: dsh.status
+  inbox: data/inbox/dsh
+  record: data/transcripts/agent.dsh
+  capabilities: [agent.bridge, chat, reasoning, tool-use, transcript, second-brain]
+  agent_capabilities: [chat, reasoning, tool-use, transcript, second-brain]
+  description: "DSH 接入通道：平台要推给 DSH 的事件由我接住，落 inbox；同时我在平台里代表 agent.dsh。"
+
+mcp:                                     # agent 侧 MCP：DSH 用 dsh-mcp-client（stdio）
+  kind: dsh-plugin
+  server_name: brain
+  transport: stdio
+  command: "{{pyw}}"
+  args: ["{{core}}/plugins/agent_plugin.py", "--agent", "dsh", "--mcp"]
+  cwd: "{{core}}"
+  config: "~/.dsh/profiles/web/cordis.patch.yml"
+  entry_id: mcp-second-brain
+
+hook:
+  kind: none
+
+source:                                  # 日志/事件从哪来
+  events: agent-plugin                   # DSH 原生插件 dsh-second-brain 直连平台发事件
+  transcript: session-store              # 转录读 DSH 自己的会话存储
+  adapter: dsh_session
+  path: "~/.dsh/sessions"
+
+notes:
+  - "DSH 侧另有原生插件 dsh-second-brain：会话开始拉起内核、取上下文包注入、事件直连 /api/bridge/send。"
+  - "MCP 面将来可换 transport=streamable-http，让内核侧那一个进程同时当 MCP 服务端（见 mcp.tpl 注释）。"
+
+guard:                                   # **可选**：守护插件（plugin.agent-guard）看住它 —— 没在跑就拉起来
+  probe: {kind: tcp, port: 3080}         # 怎么算"它在跑"（tcp=端口有人听；proc=进程名在）
+  launcher:                              # 怎么拉起来（**默认关**：控制台点「守护：开」或 agentctl guard dsh on）
+    cmd: "cmd.exe"
+    args: ["/c", "%APPDATA%\\npm\\dsh.cmd", "web"]
+    cwd: "~"
+  kill:                                  # guard.restart 用它（等价"杀掉 → 守护拉回来"）
+    kind: cmdline
+    proc: node.exe
+    match: "*deepseek-ai\\dsh*"
+    not_match: "*subprocess-local*"
+  note: "拉起走 DETACHED_PROCESS + CREATE_NO_WINDOW：结构性不弹黑窗；restart 会掐断正在用 DSH 的会话。"

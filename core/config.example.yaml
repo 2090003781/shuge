@@ -1,0 +1,229 @@
+# Platform Core 配置**模板**（入库版本，复制成 config.yaml 后按需改）
+#
+# 为什么单独留一份：config.yaml 被 .gitignore 忽略（含本机路径/私密项），入不了版本，
+# 换机或重建时只能靠手抄。这份模板保证"有哪些插件、每个插件吃什么参数、默认开哪些"有据可查。
+# 用法：copy config.example.yaml config.yaml 然后按需修改（改完重启内核生效）。
+# 骨架 v0.3：配置驱动启动——在这里声明要装哪些插件，Core 启动时拉起
+
+# 事件总线配置
+bus:
+  queue_len: 256          # 每订阅者缓冲队列长度
+
+# 插件清单：声明要加载的插件（P4：你决定装什么）
+plugins:
+  # ------- 进程外插件（external，独立进程 + 监督） -------
+  # 日志记录（2026-09-12 由内核内 logsink 外移）：必须排在**最前**，
+  # 否则其他插件启动早期的输出会先落到内核兜底（也不是不能用，但归属就混了）。
+  #   内核 → tool=log.append {source, lines:[...]} → 本插件统一格式化/分级/轮转/落盘
+  #   插件不可达时内核本地兜底直写（行内标注 [兜底写入]）
+  - id: plugin.log
+    type: external
+    command: python
+    args: ["plugins/log_plugin.py", "--id", "plugin.log"]
+    cwd: "."
+    enabled: true
+    supervisor:
+      max_restarts: 5
+      restart_wait_ms: 1000
+  # DSH 接入通道（2026-09-12 由内核内适配器外移为独立插件）：
+  #   注册时声明 agent_id=agent.dsh → 平台登记"插件背书的 agent"；
+  #   平台经插件调用通道下发 tool=agent.deliver → 本插件把事件落 data/inbox/dsh/*.json（DSH 侧取件）
+  - id: plugin.dsh
+    type: external
+    command: python
+    args: ["plugins/dsh_plugin.py", "--id", "plugin.dsh"]
+    cwd: "."
+    enabled: true
+    supervisor:
+      max_restarts: 5
+      restart_wait_ms: 1000
+  # Reasonix 接入通道（2026-09-12 由内核内适配器外移为独立插件）：
+  #   身份 plugin.reasonix 背书 agent.reasonix；平台经 tool=agent.deliver 投递 → 落 data/inbox/*.json
+  - id: plugin.reasonix
+    type: external
+    command: python
+    args: ["plugins/reasonix_plugin.py", "--id", "plugin.reasonix"]
+    cwd: "."
+    enabled: true
+    supervisor:
+      max_restarts: 5
+      restart_wait_ms: 1000
+  # 笔记查找（2026-09-12 由内核内模块 module.note-search 外移）：
+  #   capabilities=["note.search"] 就是路由表（能力名==工具名）；
+  #   agent 发 kind=tool-call 且 tool=note.search → 内核按能力转发到本插件 → 回执给调用方
+  # 投递箱（2026-09-21 文档线第 2 步）：盯 vault，新增/变化的文件自动索引进库 —— "拖入即出现"。
+  #   默认只存放、不进检索（要搜再在库里手动加入）；首次启动只记账、不动存量
+  #   （要一次性全量镜像，给 args 加 "--import-existing"）；改名/删除不跟随（v1 边界）。
+  - id: plugin.inbox
+    type: external
+    command: python
+    args: ["plugins/inbox_plugin.py", "--id", "plugin.inbox", "--watch", "D:/个人数据/辞玖", "--under", "vault",
+             "--interval", "60", "--debounce", "0.5", "--settle", "1"]
+    cwd: "."
+    enabled: true
+    supervisor:
+      max_restarts: 5
+      restart_wait_ms: 1000
+
+  - id: plugin.note-search
+    type: external
+    command: python
+    args: ["plugins/note_search_plugin.py", "--id", "plugin.note-search"]
+    cwd: "."
+    enabled: true
+    supervisor:
+      max_restarts: 5
+      restart_wait_ms: 1000
+  # 生产：标准时钟插件（平台报时源）——发布 clock.tick / clock.hourly 事件，
+  # 定时任务/自动化可订阅该事件实现"到点干活"。
+  - id: plugin.clock
+    type: external
+    command: python
+    args: ["plugins/clock_plugin.py", "--id", "plugin.clock", "--interval", "60"]
+    cwd: "."
+    enabled: false
+    supervisor:
+      max_restarts: 5
+      restart_wait_ms: 1000
+
+  # 生产：上下文包插件（只备包不注入）——按 agent 路由组装注入包，
+  # 写 data/context/<agent>.md，供 agent 接口直读注入；定时刷新（默认 300s）
+  - id: plugin.context-pack
+    type: external
+    command: python
+    args: ["plugins/context_pack_plugin.py", "--id", "plugin.context-pack", "--interval", "300"]
+    cwd: "."
+    enabled: true
+    supervisor:
+      max_restarts: 5
+      restart_wait_ms: 1000
+
+  # 转录（2026-10-02 辞玖定案：**独立插件** + 每个 agent 接口自带「日志记录」薄入口）
+  #   数据流：hook/agent → agent 接口（只"接住"：data/transcripts/<agent>/<日期>.jsonl，立刻回执）
+  #           → 本插件组装成"一天一份" → 写进库 vault/日志/<agent>-raw/<日期>/会话.md
+  #   为什么拆成两段：「接住」不能依赖下游（hook 只有 5 秒预算，端口不通超 5.5s 就 warn/block）；
+  #           「组装 + 入库」才可以慢、可以重试、可以拿 spool 重算历史。
+  #   平台调用面：transcript.wake（agent 接口叫它）/ transcript.flush（立刻收一天）/ transcript.status
+  # ── agent 接口：**由模板生成**（2026-10-05）─────────────────────────────
+  #   一个 agent 只写一份描述文件 agents/<id>.yaml，其余由 scripts/agentctl.py 生成：
+  #     python scripts/agentctl.py scan                 # 这台机器上有哪些 agent
+  #     python scripts/agentctl.py plan <id>            # 看要写哪几处（不落盘）
+  #     python scripts/agentctl.py add  <id> --apply    # 真写（被动过的文件都留 .bak-agentctl）
+  #     python scripts/agentctl.py activate && verify <id>
+  #   下面这段就是 add 出来的样子（通用运行时 plugins/agent_plugin.py，不为每个 agent 写代码）：
+  - id: plugin.claude-code
+    type: external
+    command: python
+    args: ["plugins/agent_plugin.py", "--agent", "claude-code"]
+    cwd: "."
+    enabled: true
+    supervisor:
+      max_restarts: 5
+      restart_wait_ms: 1000
+
+  - id: plugin.transcript
+    type: external
+    command: python
+    args: ["plugins/transcript_plugin.py", "--id", "plugin.transcript", "--interval", "30",
+           "--debounce", "2"]
+    cwd: "."
+    enabled: true
+    supervisor:
+      max_restarts: 5
+      restart_wait_ms: 1000
+
+  # 钩子转录服务（辞玖 2026-10-04 定形状）：**跑在内核里、内核监督保活**；
+  #   启动时对每个 --agents 调 agent.attach.<agent> **连上 agent 接口**（连上谁就录谁），
+  #   采集端只把源读成事件，成批交给 agent.record.<agent>（日志走接口的手）→ spool → 组装入库。
+  #   触发：**事件驱动优先 + 1 秒轻轮询（只 stat）+ 60 秒兜底全扫**。
+  #   为什么不能只靠事件：源不发声时"没事件"和"健康"长得一模一样（2026-10-03 静默死了 11 小时）。
+  #   看门狗：源看着在动、却连着 --stall 秒没有新日志 → 往库里写《转录状态》（只在接口侧可查的
+  #   那份 silent_s 之外，多一道保险）。
+  #   --since 只管首次从哪天起（进度记在 data/transcripts/.hook-transcript-state.json）。
+  # Agent 接入（辞玖 2026-10-05）：自动识别本机 agent → 勾选 → 按模板生成接入 → 给提示词
+  #   控制台「Agent 接入」面板调它（tools: agents.scan / add / prompt / verify / status）
+  # agent 守护（**可选**：只在 agents/<id>.yaml 里声明了 guard 段的 agent 上生效；
+  #   每个 agent 一个开关，存 data/agents/guard.json，默认关，控制台可点）
+  #   拉起走 DETACHED_PROCESS + CREATE_NO_WINDOW —— 结构性不弹黑窗。
+  - id: plugin.agent-guard
+    type: external
+    command: python
+    args: ["plugins/agent_guard_plugin.py", "--id", "plugin.agent-guard", "--interval", "3"]
+    cwd: "."
+    enabled: true
+    supervisor:
+      max_restarts: 5
+      restart_wait_ms: 1000
+  - id: plugin.agentctl
+    type: external
+    command: python
+    args: ["plugins/agentctl_plugin.py", "--id", "plugin.agentctl"]
+    cwd: "."
+    enabled: true
+    supervisor:
+      max_restarts: 5
+      restart_wait_ms: 1000
+  - id: plugin.hook-transcript
+    type: external
+    command: python
+    args: ["plugins/hook_transcript_plugin.py", "--id", "plugin.hook-transcript",
+           "--agents", "agent.dsh,agent.reasonix", "--fast", "1", "--interval", "60",
+           "--since", "2026-10-03", "--stall", "1200"]
+    cwd: "."
+    enabled: true
+    supervisor:
+      max_restarts: 5
+      restart_wait_ms: 1000
+
+  # 测试：Python 心跳插件（验证 AD-1 跨进程监督——崩溃自动重启）；
+  # 只做监督机制测试，不参与实际功能；需要时改 enabled: true
+  - id: demo.heartbeat
+    type: external
+    command: python
+    args: ["plugins/demo_heartbeat.py", "--id", "heartbeat-A"]
+    cwd: "."
+    enabled: false
+    supervisor:                       # 监督策略（默认即可）
+      max_restarts: 5
+      restart_wait_ms: 1000
+
+# 数据资源（插件经 Env 访问）
+resources:
+  vault:
+    path: "D:/个人数据/辞玖"
+
+# agent 接入配置：会话开始的上下文注入（2026-09-10 定稿）
+# 机制：plugin.context 按 routes 组装包 → 写 data/context/<agent>.md → agent 接口直读注入
+# 开关：enabled=false → 该 agent 不注入（控制台详情页也可切换）
+agent:
+  session_start:
+    context_dir: "data/context"
+    routes:
+      - agent: agent.reasonix
+        enabled: true
+        docs: [persona, profile, rules-l1]
+      - agent: agent.qq-bot
+        enabled: false
+        docs: [rules-l1]
+      # DSH（DeepSeek Harness）—— 2026-09-11 接入：由 DSH 侧 dsh-second-brain 插件
+      # 在会话开始时 POST /api/agent/session-start 取包注入（等价 reasonix 的 hook 链路）
+      - agent: agent.dsh
+        enabled: true
+        docs: [persona, profile, rules-l1]
+
+# 中间平台（bridge 主框架）：连接 agent 与笔记软件，所有功能以模块形式接入。
+# 骨架期：只启框架（0 agent / 0 module），具体能力（热缓存/RAG/规则…）后续挂模块。
+bridge:
+  enabled: true
+  agents: []        # 骨架期预留：agent 适配器声明（当前 agent.reasonix / agent.dsh 由
+                    # cmd/core/main.go 代码注册，此处仍留作未来配置化接入）
+  modules: []       # 骨架期预留：功能模块声明（如 knowledge-index）
+# 安全（2026-09-12 插件面/上报面鉴权）
+security:
+  # agent 上报面（/api/bridge/send、/api/agent/session-start）鉴权模式：
+  #   soft  = 校验并记账、但放行（迁移期：先看清谁没带 token，再转强制）
+  #   strict= 不带/带错 token 直接 401（DSH 插件与 reasonix hook 都带上 token 后再开）
+  #   off   = 完全不校验（单机调试）
+  # token 由内核生成在 data/plugins/token.json（0600，不入库）；插件由内核注入环境变量，
+  # 平台外接入方（DSH 插件 / reasonix hook）自己去读那个文件。
+  agent_uplink_auth: strict   # 生产值（strict）；迁移期可用 soft：先记账放行，看清谁没带 token 再转强制

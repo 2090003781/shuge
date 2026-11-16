@@ -1,0 +1,8 @@
+{
+  "base_url": "http://127.0.0.1:8848",
+  "timeout_sec": 120,
+  "_说明": "权限在这里调：expose_tiers 决定暴露哪些档（read/write/danger）；require_confirm 里的工具必须带 confirm=true 才会执行；disabled_tools 直接拉黑。",
+  "expose_tiers": ["read", "write"],
+  "require_confirm": ["set_note_rag", "reindex"],
+  "disabled_tools": []
+}

@@ -1,0 +1,68 @@
+# Reasonix（reasonix）— agent 接入描述文件
+#
+# 路径不写死：`{{pyw}}` = 本机不弹黑窗的 python，`{{core}}` = 本平台装在哪
+# （写进你的配置时由 scripts/agentctl.py 按**本机识别结果**填；2026-10-06 辞玖定）
+# 填写人：reasonix 自己（按 templates/agent/handoff.tpl 的手工单）
+#
+# 与平台侧 2026-10-05 判断的订正记录：
+#   · 「reasonix 没有 MCP 客户端」= **错的**。%APPDATA%/reasonix/config.toml 的
+#     [[plugins]] 就是外部 MCP 表（本机现有 10 条：mimo-vision/obsidian/doubao-vision/
+#     supervisor/blender/bot-mcp/web-llm…），接法用它自己的官方 CLI：
+#         reasonix-cli.exe mcp add <name> -- <command> [args...]
+#   · 另有 ~/.reasonix/config.toml（6KB，2 条 [[plugins]]）也是 TOML 的 [[plugins]] 形状，
+#     但**真正生效的全局 MCP 表是 %APPDATA%/reasonix/config.toml** —— 别认错文件。
+#   · agentctl 对 kind=reasonix-toml **只读不写**（写它的 TOML 有把它已有条目冲掉的风险），
+#     所以 MCP 那一处由 reasonix 自己用官方 CLI 落盘（见下面的 mcp 段）。
+id: reasonix
+name: Reasonix
+agent_id: agent.reasonix
+plugin_id: plugin.reasonix
+
+detect:                                  # 自动识别：任一命中 = 这台机器装了它
+  paths: ["%APPDATA%/reasonix"]
+  files: ["%APPDATA%/reasonix/config.toml", "~/.reasonix/logs/hook_logger.py"]
+  exes: []
+
+interface:                               # 内核侧接口（生成 config.yaml 条目）
+  tier: write                            # 档位：read / write / trust（brain_ops 要读写笔记库 → write）
+  status_tool: reasonix.status
+  inbox: data/inbox/reasonix
+  record: data/transcripts/agent.reasonix
+  capabilities: [agent.bridge, chat, reasoning, tool-use]
+  agent_capabilities: [chat, reasoning, tool-use]
+  description: "Reasonix 接入通道：MCP 面给它软件操作。"
+
+mcp:                                     # agent 侧 MCP：[[plugins]] 形状（TOML），由它自己的 CLI 写
+  kind: reasonix-toml
+  server_name: brain
+  transport: stdio
+  command: "{{pyw}}"   # 一律 pythonw.exe：宿主 spawn，给不了 CREATE_NO_WINDOW
+  args: ["{{core}}/plugins/agent_plugin.py", "--agent", "reasonix", "--mcp"]
+  cwd: "{{core}}"
+  config: "%APPDATA%/reasonix/config.toml"   # ← 生效的那份（**不是** ~/.reasonix/config.toml）
+  entry_id: "plugins.brain"
+
+hook:
+  # 事件面**此前就接好了**（2026-10-02 那版 hook_logger.py 的「第四路」）：
+  #   ~/.reasonix/settings.json 里 5 条 hook（SessionStart/UserPromptSubmit/PreToolUse/
+  #   PostToolUse/Stop）都指向 ~/.reasonix/logs/hook_logger.py，它把事件 POST
+  #   /api/bridge/send（能力名 agent.record.reasonix）→ 落 data/transcripts/agent.reasonix/。
+  #   探活走 8790（宿主/库口径），所以 kind 写 reasonix-toml（这个形状 agentctl 只读不写）。
+  #   ⚠️ 平台侧的 plugins/hook_client.py **不用** —— 那条是给"没有 MCP 但有 hook"的 agent 的。
+  kind: reasonix-toml
+  config: "~/.reasonix/settings.json"
+  command: ""
+  client: "%USERPROFILE%/.reasonix/logs/hook_logger.py"   # ← 实际用的就是它（不是通用客户端）
+  actual_client: "hook_logger.py"                 # 平台据此判定"hook 配上了"
+
+source:                                  # 日志/事件从哪来（转录用；仅文档性质）
+  events: agent-plugin                   # 事件由 hook_logger.py 直推平台
+  transcript: none                       # 转录由平台侧 plugin.transcript 从 spool 组装入
+  adapter: ""
+  path: "~/.reasonix/sessions"
+
+notes:
+  - "MCP 面落地命令（agentctl 只读不写这个形状，必须自己跑）："
+  - '  reasonix-cli.exe mcp add brain -- <本机 pythonw> <平台目录>/plugins/agent_plugin.py --agent reasonix --mcp'
+  - "  CLI 的改动在**下一个会话**生效（reasonix mcp add --help 原话），所以要重启宿主才验得了 brain_ops。"
+  - "不要用 python.exe（每来一次闪一个黑框，主人硬要求一个黑窗都不许有）。"

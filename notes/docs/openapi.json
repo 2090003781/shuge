@@ -1,0 +1,3457 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "枢阁 库接口",
+  "version": "1.0.0",
+  "description": "枢阁 / 库的本地 HTTP 接口。全部返回 JSON；异常返回 {ok:false, error}；只监听 127.0.0.1。"
+ },
+ "servers": [
+  {
+   "url": "http://127.0.0.1:8848"
+  }
+ ],
+ "paths": {
+  "/api/health": {
+   "get": {
+    "summary": "存活与统计（文件/块/向量/未入检索/待补/清单）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    }
+   }
+  },
+  "/api/tree": {
+   "get": {
+    "summary": "文件夹树（含每层文件；不含正文）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    }
+   }
+  },
+  "/api/folders": {
+   "get": {
+    "summary": "文件夹扁平表（含路径，给移动用）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    }
+   },
+   "post": {
+    "summary": "新建文件夹",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "parent_id": {
+          "type": "string",
+          "description": "str"
+         },
+         "path": {
+          "type": "string",
+          "description": "str"
+         },
+         "name": {
+          "type": "string",
+          "description": "str 必填"
+         }
+        },
+        "required": [
+         "name"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/tags": {
+   "get": {
+    "summary": "标签统计",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    }
+   }
+  },
+  "/api/rag/list": {
+   "get": {
+    "summary": "列出在/不在检索库的文件（on=1|0 过滤，带库内路径）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "on",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 1=在检索库 0=不在"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 条数"
+     }
+    ]
+   }
+  },
+  "/api/tables": {
+   "get": {
+    "summary": "列出所有数据表（表格线：csv/tsv 建的表）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    }
+   },
+   "post": {
+    "summary": "从磁盘 csv/tsv/xlsx 建表（xlsx 每个 sheet 一张；原文件同时留档、默认不进检索）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "src": {
+          "type": "string",
+          "description": "str 必填 磁盘路径"
+         },
+         "under": {
+          "type": "string",
+          "description": "str 落到库内哪个目录"
+         },
+         "title": {
+          "type": "string",
+          "description": "str 表标题"
+         },
+         "sheet": {
+          "type": "string",
+          "description": "str 只取某个 sheet"
+         },
+         "replace": {
+          "type": "boolean",
+          "description": "bool 重名时覆盖"
+         },
+         "delimiter": {
+          "type": "string",
+          "description": "str csv 分隔符"
+         }
+        },
+        "required": [
+         "src"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/table_rows": {
+   "get": {
+    "summary": "只读查询某张表（白名单 + 参数绑定）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "name",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 必填 表名"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 默认 200"
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 默认 0"
+     },
+     {
+      "name": "sort",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 排序列"
+     },
+     {
+      "name": "desc",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 1=倒序"
+     },
+     {
+      "name": "q",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 过滤词"
+     }
+    ]
+   }
+  },
+  "/api/search": {
+   "get": {
+    "summary": "检索：关键词 + 向量 RRF（可 rerank / 时间收窄 / 排除归档）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 必填 查询词"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 默认8"
+     },
+     {
+      "name": "mode",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str kw=仅关键词"
+     },
+     {
+      "name": "scope",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str all=含归档"
+     },
+     {
+      "name": "since",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 起（按笔记日期）"
+     },
+     {
+      "name": "until",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 止"
+     },
+     {
+      "name": "expand",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str article=按篇召回"
+     },
+     {
+      "name": "n",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 按篇召回想几篇"
+     },
+     {
+      "name": "rerank",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 0/1 关开精排"
+     },
+     {
+      "name": "time",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 0/1 同级时间优先"
+     },
+     {
+      "name": "exclude",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 排除的标签，逗号分隔"
+     },
+     {
+      "name": "timing",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 1=返回各段耗时"
+     }
+    ]
+   }
+  },
+  "/api/content": {
+   "get": {
+    "summary": "按库内路径取正文（单条，可截断）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "path",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 必填 库内路径"
+     },
+     {
+      "name": "max",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 最多取多少字"
+     }
+    ]
+   }
+  },
+  "/api/content/batch": {
+   "post": {
+    "summary": "批量取正文（组「注入包」用）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "paths": {
+          "type": "array",
+          "description": "list 必填 库内路径数组"
+         },
+         "max": {
+          "type": "integer",
+          "description": "int 每条最多多少字"
+         }
+        },
+        "required": [
+         "paths"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/writers": {
+   "get": {
+    "summary": "这篇最近被谁改过（写入者标签，来源事件）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/visibility/batch": {
+   "post": {
+    "summary": "**批量切可见性**：多选后一次把若干篇设为私密 / 移出私密（设为私密**锁着也能做**——用库公钥封内容密钥；移出私密要解密，必须先解锁）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "ids": {
+          "type": "array",
+          "description": "list 要处理的文件 id"
+         },
+         "folder_id": {
+          "type": "string",
+          "description": "str 也可以整夹（配 recursive）"
+         },
+         "recursive": {
+          "type": "boolean",
+          "description": "bool 整夹是否含子文件夹（默认 true）"
+         },
+         "visibility": {
+          "type": "string",
+          "description": "str private|internal"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/docx": {
+   "get": {
+    "summary": "**DOCX 引擎读模型**：块（段落/表格/图片 + 样式与 run）+ 篇信息 + 渲染好的 HTML",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}/docx/edit": {
+   "post": {
+    "summary": "**DOCX 引擎写回**：一批编辑操作（改字/改样式/增删移段/表格/查找替换/插图/页面设置），**原地改 OOXML，没碰到的样式与部件原样保留**",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "ops": {
+          "type": "array",
+          "description": "list 必填 [{op,...}]；op=text|run|para|insert|del|move|cell|row|replace|image|page"
+         },
+         "allow_shrink": {
+          "type": "boolean",
+          "description": "bool 新正文不足原文一半时要不要放行（默认 false 就拒绝）"
+         }
+        },
+        "required": [
+         "ops"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/docx/export": {
+   "post": {
+    "summary": "**导出成新文件**：md / txt / html（引擎抽）或 pdf（WPS 直接吃 docx，样式不简化）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "to": {
+          "type": "string",
+          "description": "str md|txt|html|pdf（默认 md）"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/pdf": {
+   "get": {
+    "summary": "**PDF 引擎总入口**：页 / 元信息 / 目录 / **批注清单** / 是不是扫描件",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}/pdf/text": {
+   "get": {
+    "summary": "第 n 页的**文字层**（行 + span + bbox）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "n",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 页码，从 1 起"
+     },
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}/pdf/annot": {
+   "post": {
+    "summary": "**加/删批注**（一次可多条，最后一起写回；先留前像）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "add": {
+          "type": "array",
+          "description": "list 要加的批注 [{page,kind,rects,text,color,author}]；kind=highlight/underline/strikeout/squiggly/note/text/rect/ink"
+         },
+         "del": {
+          "type": "array",
+          "description": "list 要删的批注 id（GET /pdf 的 annots[].id）"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/pdf/pages": {
+   "post": {
+    "summary": "**页面操作**：rotate（转 90°）/ delete / move / extract（提取成新的一篇）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "op": {
+          "type": "string",
+          "description": "str rotate|delete|move|extract"
+         },
+         "n": {
+          "type": "integer",
+          "description": "int 第几页"
+         },
+         "to": {
+          "type": "integer",
+          "description": "int move 的目标位置"
+         },
+         "nums": {
+          "type": "array",
+          "description": "list extract 要哪几页，如 [1,3]"
+         },
+         "name": {
+          "type": "string",
+          "description": "str extract 出来的新文件名"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/pdf/text-edit": {
+   "post": {
+    "summary": "**擦字重画**：擦掉指定位置的原字、在原基线按原字体原字号重画新字（字体按用到的字**子集嵌入**）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "ops": {
+          "type": "array",
+          "description": "list 必填 [{page,rect:[x0,y0,x1,y1],text,size?,color?,font?,align?,shrink?}]；空 text = 只擦不画"
+         }
+        },
+        "required": [
+         "ops"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/pdf/replace": {
+   "post": {
+    "summary": "**全篇查找替换**（命中的整行擦掉重画；没命中就不写回）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "q": {
+          "type": "string",
+          "description": "str 要找的"
+         },
+         "rep": {
+          "type": "string",
+          "description": "str 换成什么（默认空 = 删掉）"
+         },
+         "pages": {
+          "type": "array",
+          "description": "list 只在这几页里换（默认全篇）"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/pdf/stamp": {
+   "post": {
+    "summary": "**印记**：kind=pageno 盖页码（写进内容、文字层干净）/ kind=watermark 盖斜水印（**是图**）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "kind": {
+          "type": "string",
+          "description": "str pageno|watermark"
+         },
+         "text": {
+          "type": "string",
+          "description": "str 水印文字"
+         },
+         "start": {
+          "type": "integer",
+          "description": "int 页码从几开始"
+         },
+         "fmt": {
+          "type": "string",
+          "description": "str 页码格式（两个 %d = 当前页 / 总页数）"
+         },
+         "size": {
+          "type": "string",
+          "description": "float 字号"
+         },
+         "where": {
+          "type": "string",
+          "description": "str bottom-center|bottom-right|top-center"
+         },
+         "color": {
+          "type": "string",
+          "description": "str #rrggbb 或 [r,g,b]"
+         },
+         "margin": {
+          "type": "string",
+          "description": "float 距边（pt）"
+         },
+         "opacity": {
+          "type": "string",
+          "description": "float 水印透明度 0~1"
+         },
+         "angle": {
+          "type": "string",
+          "description": "float 水印角度"
+         },
+         "pages": {
+          "type": "array",
+          "description": "list 只盖这几页（默认全篇）"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/pdf/merge": {
+   "post": {
+    "summary": "**合并**别的 PDF 进来（写回这一篇；要并的那几篇必须是 PDF）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "ids": {
+          "type": "array",
+          "description": "list 要并进来的文件 id（最多 10 篇）"
+         },
+         "id": {
+          "type": "string",
+          "description": "str 只并一篇时的简写"
+         },
+         "where": {
+          "type": "string",
+          "description": "str end|start|页码下标"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/pdf/flatten": {
+   "post": {
+    "summary": "**扁平化**：把批注烤进页面内容（⚠️ 这一页会变成图，不再是文字）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "dpi": {
+          "type": "integer",
+          "description": "int 烤图分辨率（默认 150）"
+         },
+         "pages": {
+          "type": "array",
+          "description": "list 只烤这几页（默认全篇有批注的页）"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/pdf/export-images": {
+   "post": {
+    "summary": "**导出图片**：每页一张 PNG，**产出新文件**（不写回原篇）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "nums": {
+          "type": "array",
+          "description": "list 要导哪几页（默认全篇，一次最多 30 页）"
+         },
+         "pages": {
+          "type": "array",
+          "description": "list 同 nums（兼容写法）"
+         },
+         "dpi": {
+          "type": "integer",
+          "description": "int 分辨率（默认 110）"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/pages": {
+   "get": {
+    "summary": "PDF 页清单（页码 / 宽高 / 每页字数；阅读器用）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}/page": {
+   "get": {
+    "summary": "PDF 第 n 页 → PNG（阅读器逐页渲染）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "n",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 页码，从 1 起"
+     },
+     {
+      "name": "w",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 目标宽度像素（默认 1200，200~4000）"
+     },
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}/find": {
+   "get": {
+    "summary": "PDF 全文查找：每处命中的页码 + 矩形 + 片段（跳页高亮用）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 必填 要找的字"
+     },
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}/writeback": {
+   "post": {
+    "summary": "**文档编辑器保存**：把编辑器里的 Markdown 按原格式（docx/odt/rtf/html/epub/pdf）重新生成，写回同一篇（先留前像）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "content": {
+          "type": "string",
+          "description": "str 必填 正文（Markdown）"
+         },
+         "allow_shrink": {
+          "type": "boolean",
+          "description": "bool 缩太多时的二次确认"
+         }
+        },
+        "required": [
+         "content"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/raw": {
+   "get": {
+    "summary": "原文件字节（图片/二进制直出，按扩展名给 Content-Type；加锁的 403）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}": {
+   "get": {
+    "summary": "读一篇（正文 + @提及 + 反向链接 + 标签 + 派生摘要 + 块树统计 + 入库/修改时间）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   },
+   "put": {
+    "summary": "保存正文（重新索引 + 重建 @提及边 + 补向量）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "content": {
+          "type": "string",
+          "description": "str 必填 新正文（文本格式；文档格式会被拒）"
+         },
+         "allow_shrink": {
+          "type": "boolean",
+          "description": "bool 真允许「缩短很多」（默认拦，返回 shrink_refused）"
+         },
+         "writer": {
+          "type": "string",
+          "description": "str 写入者标签（也可走 X-Writer 头）"
+         }
+        },
+        "required": [
+         "content"
+        ]
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "summary": "删除文件（立墓碑，级联清派生层与引用边）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}/text": {
+   "get": {
+    "summary": "取文档解析出来的 Markdown（?refresh=1 强制重解析）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "refresh",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 1=重算"
+     },
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}/blocks": {
+   "get": {
+    "summary": "块树（页/块/类型/层级/bbox/表格）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 只看某页"
+     },
+     {
+      "name": "page_no",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 同上（兼容写法）"
+     },
+     {
+      "name": "type",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 只看某类块"
+     },
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}/backlinks": {
+   "get": {
+    "summary": "反向链接（谁引用了我，可按小节筛）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "section",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 只看引这一节的"
+     },
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}/article": {
+   "get": {
+    "summary": "按篇还原（整篇 / 某一节），给阅读与组包",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "focus",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 聚焦到哪一节"
+     },
+     {
+      "name": "q",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 配合 focus 判断含词"
+     },
+     {
+      "name": "max",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 整篇上限字数"
+     },
+     {
+      "name": "section",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 取哪一节"
+     },
+     {
+      "name": "section_max",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 单节上限字数"
+     },
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/events": {
+   "get": {
+    "summary": "增量拉事件（位点续读）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "after",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 从哪个 gseq 之后"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 条数"
+     },
+     {
+      "name": "types",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 事件类型，逗号分隔"
+     },
+     {
+      "name": "writer",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 只看某个写入者"
+     }
+    ]
+   }
+  },
+  "/api/events/replay": {
+   "get": {
+    "summary": "按 gseq 区间重放事件（dry_run=1 只算不写）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "from",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int"
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int"
+     },
+     {
+      "name": "types",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str"
+     },
+     {
+      "name": "dry_run",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 1=只预演"
+     }
+    ]
+   }
+  },
+  "/api/convert/engines": {
+   "get": {
+    "summary": "转换引擎状态（pandoc 版本 / WPS 可用否 / 能写出哪些格式）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    }
+   }
+  },
+  "/api/lock": {
+   "get": {
+    "summary": "锁状态（configured / unlocked / expires_in）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    }
+   }
+  },
+  "/api/debug/stack-dump": {
+   "post": {
+    "summary": "卡死抓栈：after 秒后把所有线程的栈打到日志（after=0 立即打）。**改成 POST**：它会写日志+装定时器",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "after": {
+          "type": "integer",
+          "description": "int 秒，默认 60"
+         },
+         "repeat": {
+          "type": "boolean",
+          "description": "bool 默认 1"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/properties": {
+   "get": {
+    "summary": "按属性看全库（哪些键/哪些值/各多少篇）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "key",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 只看某一个键"
+     }
+    ]
+   }
+  },
+  "/api/properties/find": {
+   "get": {
+    "summary": "按属性找笔记（key=必填，value 空=只要有这个键）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "key",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 必填"
+     },
+     {
+      "name": "value",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 可空"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 默认 50"
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 默认 0"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}/properties": {
+   "post": {
+    "summary": "改文件头 YAML 属性（与库元数据联动）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "set": {
+          "type": "string",
+          "description": "dict 要设的键值"
+         },
+         "del": {
+          "type": "array",
+          "description": "list 要删的键"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/maintenance/private-rekey": {
+   "post": {
+    "summary": "一次性维修：密钥丢了读不出来的私密篇，用磁盘明文按当前主密钥重新加密（需已解锁）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "src": {
+          "type": "string",
+          "description": "str 可省：明文所在目录（默认先找 vault、再找库文件夹）"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/maintenance/frontmatter-backfill": {
+   "post": {
+    "summary": "一次性维护：把库里已有笔记的文件头 YAML 属性补解析一遍。**改成 POST，且范围必须显式**：不给 limit 只补 100 篇，全库要 all:true（原来 GET 的 limit=0 会被兜成「全库」）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "limit": {
+          "type": "integer",
+          "description": "int 最多扫多少篇（默认 100）"
+         },
+         "all": {
+          "type": "boolean",
+          "description": "bool true=全库"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/pick": {
+   "post": {
+    "summary": "弹系统「选文件 / 选文件夹」框（本机窗口；立刻回 token，再用 GET /api/pick 轮询结果）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "kind": {
+          "type": "string",
+          "description": "str file|dir 默认 file"
+         },
+         "title": {
+          "type": "string",
+          "description": "str 窗口标题"
+         },
+         "dry_run": {
+          "type": "boolean",
+          "description": "bool 只验协议不弹窗（验收用）"
+         },
+         "fake": {
+          "type": "string",
+          "description": "str 配合 dry_run：假装选了这个路径"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "summary": "取系统选择框的结果：state=pending|ok|canceled|error，ok 时 paths 是选中的绝对路径",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "token",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 必填 从 POST /api/pick 拿"
+     }
+    ]
+   }
+  },
+  "/api/maintenance/selfcheck": {
+   "get": {
+    "summary": "一键自检（子进程跑 tools/selfcheck.py --json）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    }
+   }
+  },
+  "/api/files": {
+   "post": {
+    "summary": "新建文件（**格式由 format 显式规定**；name 写 .docx/.pdf 等照样现场生成真文档）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "folder_id": {
+          "type": "string",
+          "description": "str 默认根目录"
+         },
+         "name": {
+          "type": "string",
+          "description": "str 文件名（可含扩展名）"
+         },
+         "content": {
+          "type": "string",
+          "description": "str 文本内容"
+         },
+         "content_b64": {
+          "type": "string",
+          "description": "str 二进制内容（与 content 二选一）"
+         },
+         "format": {
+          "type": "string",
+          "description": "str 指定格式：md/txt/json/jsonl/csv/tsv/yml/log/html/…（文本族，库内可直接编辑）或 docx/odt/rtf/pdf/epub/html（文档族，pandoc/WPS 现场生成）。规则：给了它就以它为准，和 name 里的扩展名不一致 → 400；没给就按 name 的扩展名；**name 没有扩展名 → 默认 md**"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/sections": {
+   "post": {
+    "summary": "**按小节改正文**（写正文的第三种形态：整篇 set / 尾部 append / **按节** section）：只动那一节，其余一个字不碰",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "mode": {
+          "type": "string",
+          "description": "str 必填 replace=换这一节正文 / append=在节内末尾接 / insert=加一节 / delete=删这一节"
+         },
+         "name": {
+          "type": "string",
+          "description": "str 必填 小节名（insert 时是新节名；匹配按库里的归一规则，整串优先）"
+         },
+         "text": {
+          "type": "string",
+          "description": "str 新正文（replace/append/insert 用）"
+         },
+         "new_name": {
+          "type": "string",
+          "description": "str replace 时顺手改名"
+         },
+         "after": {
+          "type": "string",
+          "description": "str insert 插在哪一节后面（不给就放文末）"
+         },
+         "level": {
+          "type": "integer",
+          "description": "int insert 的标题层级（不给就跟 after 同级，还没有就 2）"
+         }
+        },
+        "required": [
+         "mode",
+         "name"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/reindex": {
+   "post": {
+    "summary": "**单篇重建派生层**（块/向量/派生；不改正文）—— 全库 reindex 太重，靠 PUT 重建又会改 mtime、留前像、发「改过了」的事件",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "force_parse": {
+          "type": "boolean",
+          "description": "bool 文档格式：把解析结果丢掉重新解析"
+         },
+         "with_vectors": {
+          "type": "boolean",
+          "description": "bool 顺带补这一篇的向量"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/append": {
+   "post": {
+    "summary": "**正文尾部追加一段**（不是整篇替换）：给日志转录那种只会越长的篇用；盘上那份也按字节追加",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string",
+          "description": "str 必填 要追加的正文（文本类篇才给追加；文档类拒绝）"
+         }
+        },
+        "required": [
+         "text"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/rename": {
+   "post": {
+    "summary": "改名（引用处跟着改，小节引用跟着跟随）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string",
+          "description": "str 必填 新名"
+         }
+        },
+        "required": [
+         "name"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/move": {
+   "post": {
+    "summary": "移动（按 folder_id 或 path）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "folder_id": {
+          "type": "string",
+          "description": "str"
+         },
+         "path": {
+          "type": "string",
+          "description": "str 库内路径"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/tags": {
+   "post": {
+    "summary": "改标签",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "tags": {
+          "type": "array",
+          "description": "list 必填"
+         },
+         "mode": {
+          "type": "string",
+          "description": "str add|remove|set"
+         }
+        },
+        "required": [
+         "tags"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/table_drop": {
+   "post": {
+    "summary": "删表（原文件还在，随时可重建）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string",
+          "description": "str 必填 表名"
+         }
+        },
+        "required": [
+         "name"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/rag/batch": {
+   "post": {
+    "summary": "批量进/出检索库（on=true 时才嵌入）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "ids": {
+          "type": "array",
+          "description": "list 文件 id 数组"
+         },
+         "folder_id": {
+          "type": "string",
+          "description": "str 整个文件夹"
+         },
+         "on": {
+          "type": "boolean",
+          "description": "bool 必填 true=加入"
+         },
+         "recursive": {
+          "type": "boolean",
+          "description": "bool 含子文件夹"
+         }
+        },
+        "required": [
+         "on"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/import/upload": {
+   "post": {
+    "summary": "浏览器选好文件后按字节导入（不需要磁盘路径；可带 rel_dir 保留目录层级）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "files": {
+          "type": "array",
+          "description": "list 必填 [{name, content_b64, rel_dir?}]（最多 500 个）"
+         },
+         "under": {
+          "type": "string",
+          "description": "str 落到库内哪个目录"
+         },
+         "rag": {
+          "type": "boolean",
+          "description": "bool 是否进检索（默认不进）"
+         },
+         "private": {
+          "type": "boolean",
+          "description": "bool 按私密进库（需先解锁）"
+         }
+        },
+        "required": [
+         "files"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/import": {
+   "post": {
+    "summary": "把磁盘上的文件/目录索引进库（默认不进检索）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "src": {
+          "type": "string",
+          "description": "str 必填 磁盘路径（文件或目录）"
+         },
+         "under": {
+          "type": "string",
+          "description": "str 落到库内哪个目录"
+         },
+         "tag": {
+          "type": "string",
+          "description": "str 打标签"
+         },
+         "rag": {
+          "type": "boolean",
+          "description": "bool 是否进检索（默认不进）"
+         },
+         "overwrite": {
+          "type": "boolean",
+          "description": "bool 覆盖已存在的同名篇"
+         },
+         "private": {
+          "type": "boolean",
+          "description": "bool 按私密进库（需先解锁）"
+         }
+        },
+        "required": [
+         "src"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/before-images": {
+   "get": {
+    "summary": "高风险操作（删除/覆盖）留下的前像清单（私密篇不留前像）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "file_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      },
+      "description": "str 只看某篇"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer"
+      },
+      "description": "int 默认 50"
+     }
+    ]
+   }
+  },
+  "/api/before-images/restore": {
+   "post": {
+    "summary": "按前像恢复（文件还在就换回正文，已删除就重建）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "description": "str 前像 id"
+         },
+         "file_id": {
+          "type": "string",
+          "description": "str 也可按篇取最近一条"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/before-images/prune": {
+   "post": {
+    "summary": "清理旧前像（只删前像，不动正文；锁定时 403）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "days": {
+          "type": "integer",
+          "description": "int 默认 30，至少 1"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/mirror": {
+   "get": {
+    "summary": "库文件夹 / vault 的路径配置（历史名字带 mirror；**不是镜像管线**）",
+    "tags": [
+     "read"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    }
+   }
+  },
+  "/api/mirror/config": {
+   "post": {
+    "summary": "设置镜像配置（只改传进来的那几个键）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "enabled": {
+          "type": "boolean",
+          "description": "bool 总开关：正式启用库后设 false，不再维持镜像管线"
+         },
+         "library_dir": {
+          "type": "string",
+          "description": "str 库文件夹"
+         },
+         "vault_dir": {
+          "type": "string",
+          "description": "str vault"
+         },
+         "ignore": {
+          "type": "array",
+          "description": "list 忽略前缀"
+         },
+         "private": {
+          "type": "array",
+          "description": "list 私密前缀（跳过同步）"
+         },
+         "append_only": {
+          "type": "array",
+          "description": "list 只追加目录（永不覆盖）"
+         },
+         "backup_root": {
+          "type": "string",
+          "description": "str 覆盖前备份到哪"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/mirror/sync": {
+   "post": {
+    "summary": "**已退役（2026-09-30 归档）**：回 410 Gone（配置里 enabled=false 时直接不跑，如实返回 disabled）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "apply": {
+          "type": "boolean",
+          "description": "bool 默认 true；false=只预演"
+         },
+         "import": {
+          "type": "boolean",
+          "description": "bool 默认 true；false=只同步不导库"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/rag": {
+   "post": {
+    "summary": "进 / 出检索库（on=false 只存放，不清文件）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "on": {
+          "type": "boolean",
+          "description": "bool 必填 true=加入"
+         }
+        },
+        "required": [
+         "on"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/convert": {
+   "post": {
+    "summary": "格式转换 / 导出（to=md|docx|odt|rtf|html|epub|pdf）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "to": {
+          "type": "string",
+          "description": "str 目标格式"
+         },
+         "name": {
+          "type": "string",
+          "description": "str 产物名"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/files/{id}/sections/relink": {
+   "post": {
+    "summary": "修正指向本篇小节（old→new）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "old": {
+          "type": "string",
+          "description": "str 必填"
+         },
+         "new": {
+          "type": "string",
+          "description": "str 必填"
+         }
+        },
+        "required": [
+         "old",
+         "new"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/folders/{id}/rename": {
+   "post": {
+    "summary": "文件夹改名（引用处路径跟着改）",
+    "tags": [
+     "write"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string",
+          "description": "str 必填"
+         }
+        },
+        "required": [
+         "name"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/batch": {
+   "post": {
+    "summary": "**批量**：把一个操作施加到一组目标（白名单见 `BATCH_OPS`；内部转发到单条路由，所以新操作登记进目录就自动可批量）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "op": {
+          "type": "string",
+          "description": "str 必填 操作名（rag/visibility/tag/move/properties/delete）"
+         },
+         "ids": {
+          "type": "array",
+          "description": "list 目标文件 id（file 类操作）"
+         },
+         "paths": {
+          "type": "array",
+          "description": "list 目标库内路径（path 类操作）"
+         },
+         "args": {
+          "type": "string",
+          "description": "object 该操作的参数（原样转给单条路由）"
+         },
+         "on_error": {
+          "type": "string",
+          "description": "str continue=出错也继续（默认）/ stop=第一处错就停"
+         },
+         "dry_run": {
+          "type": "boolean",
+          "description": "bool 只列出要做什么，不动手"
+         }
+        },
+        "required": [
+         "op"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/reindex": {
+   "post": {
+    "summary": "重建索引（默认只重建变过的；full=true 才全量）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "reason": {
+          "type": "string",
+          "description": "str"
+         },
+         "full": {
+          "type": "boolean",
+          "description": "bool 全量重建"
+         },
+         "with_vectors": {
+          "type": "boolean",
+          "description": "bool 顺带补向量"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/folders/{id}": {
+   "delete": {
+    "summary": "删空文件夹",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ]
+   }
+  },
+  "/api/files/{id}/visibility": {
+   "post": {
+    "summary": "切可见性（public|internal|private）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "文件/文件夹 id"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "visibility": {
+          "type": "string",
+          "description": "str 必填"
+         }
+        },
+        "required": [
+         "visibility"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/lock/set": {
+   "post": {
+    "summary": "首次设库密码",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "password": {
+          "type": "string",
+          "description": "str 必填"
+         },
+         "confirm": {
+          "type": "string",
+          "description": "str 必填 确认密码"
+         }
+        },
+        "required": [
+         "password",
+         "confirm"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/lock/reset": {
+   "post": {
+    "summary": "重设库密码：清掉密钥材料（危险；**必须先解锁**才允许，忘密码走命令行工具）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "confirm": {
+          "type": "boolean",
+          "description": "bool 必填 true（确认知道后果）"
+         }
+        },
+        "required": [
+         "confirm"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/lock/unlock": {
+   "post": {
+    "summary": "解锁（会话级；默认不自动上锁，只手动锁。闲置超时：AI_NOTES_LOCK_TIMEOUT=<秒>）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "password": {
+          "type": "string",
+          "description": "str 必填"
+         }
+        },
+        "required": [
+         "password"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/lock/lock": {
+   "post": {
+    "summary": "立即上锁",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    }
+   }
+  },
+  "/api/lock/change": {
+   "post": {
+    "summary": "换库密码（先解后封：私密篇用新主密钥重新加密，旧密码随即失效）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "password": {
+          "type": "string",
+          "description": "str 新密码（至少 4 位）"
+         },
+         "confirm": {
+          "type": "string",
+          "description": "str 再输一次"
+         }
+        },
+        "required": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/lock/clear": {
+   "post": {
+    "summary": "取消库密码（私密篇解密成明文并改成内部，然后清密钥材料）",
+    "tags": [
+     "trust"
+    ],
+    "responses": {
+     "200": {
+      "description": "成功"
+     },
+     "4XX": {
+      "description": "{ok:false, error}"
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "confirm": {
+          "type": "boolean",
+          "description": "bool 必填 true"
+         }
+        },
+        "required": [
+         "confirm"
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}

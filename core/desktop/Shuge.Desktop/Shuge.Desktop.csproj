@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    枢阁 · 桌面壳（shuge-app.exe）
+    辞玖 2026-10-09 23:01：「把 web 换成本地软件形式，网页版还是受限看着有点难受」。
+
+    为什么是 WinForms + WebView2（而不是重写一套原生界面）：
+      · 界面本身（HTML/CSS/JS，含主题、编辑器、PDF/DOCX 引擎）已经跑了很久、测过很多轮，
+        重写等于把三个月的东西推倒重来；
+      · WebView2 用的是系统里那个 **Edge 内核**（本机已装 154.0.4258.62 运行时），
+        所以"网页"变成"窗口里的一片区域"，同时拿到原生窗口该有的东西：
+        标题栏/任务栏图标、最大化/全屏、菜单、缩放、记忆窗口位置、独立进程。
+      · 三个服务（宿主 8790 / 库 8848 / 内核 8795）一行不动 —— 这个壳只是它们的"门脸"。
+
+    发布：dotnet publish -c Release（见 desktop/README-外壳.md）
+          → 单文件 bin\shuge-app.exe（不依赖本机 .NET SDK，自包含运行时）
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>shuge-app</AssemblyName>
+    <RootNamespace>Shuge.Desktop</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- exe 自己的图标（辞玖 2026-10-12：「程序图标可以就用之前那个枢字」）。
+         注意：这只管**文件/任务栏**上那个图标；窗口标题栏那份由 MainForm 用 <平台>\bin\shuge.ico 设，
+         两者都指向同一个「护眼底 + 枢」的图（scripts/make_icon.py 生成）。 -->
+    <ApplicationIcon>shuge.ico</ApplicationIcon>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- 体积：这些用不到，关掉 -->
+    <DebugType>none</DebugType>
+    <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- 版本：出问题时报给我是哪一版 -->
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0.0</FileVersion>
+    <Product>枢阁</Product>
+    <AssemblyTitle>枢阁</AssemblyTitle>
+    <Company>枢阁</Company>
+    <Description>枢阁桌面壳（本地软件窗口）</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3485.44" />
+  </ItemGroup>
+
+</Project>

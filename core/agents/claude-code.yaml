@@ -1,0 +1,53 @@
+# Claude Code —— agent 接入描述（**目前只被识别到，还没接**；用它当模板的第一个新接入样板）
+#
+# 路径不写死：`{{pyw}}` = 本机不弹黑窗的 python，`{{core}}` = 本平台装在哪
+# （写进你的配置时由 scripts/agentctl.py 按**本机识别结果**填；2026-10-06 辞玖定）
+id: claude-code
+name: Claude Code
+agent_id: agent.claude-code
+plugin_id: plugin.claude-code
+
+detect:
+  paths: ["~/.claude"]
+  files: ["~/.claude.json", "~/.claude/settings.json"]
+  exes: ["claude"]
+
+interface:
+  status_tool: claude-code.status
+  inbox: data/inbox/claude-code
+  record: data/transcripts/agent.claude-code
+  capabilities: [agent.bridge, chat, reasoning, tool-use, transcript]
+  agent_capabilities: [chat, reasoning, tool-use, transcript]
+  description: "Claude Code 接入通道：MCP 面给它软件操作，hook 面收它的工具事件。"
+
+mcp:                                     # 一个 agent 有**两个面**，各读各的配置（接了 CLI ≠ 接了 GUI）
+  kind: claude-cli                       # 默认接法（每个面可覆盖）
+  server_name: brain
+  transport: stdio
+  command: "{{pyw}}"
+  args: ["{{core}}/plugins/agent_plugin.py", "--agent", "claude-code", "--mcp"]
+  cwd: "{{core}}"
+  config: "~/.claude.json"               # 兼容老字段：指向 CLI 那份
+  entry_id: "mcpServers.brain"
+  hosts:
+    - name: claude-code-cli              # 命令行：走它自己的 CLI 注册（由 claude mcp add 管）
+      kind: claude-cli
+    - name: claude-desktop               # 图形版：读的是另一个文件（装了才有）
+      kind: mcp-json
+      config: "%APPDATA%/Claude/claude_desktop_config.json"
+      entry_id: "mcpServers.brain"
+
+hook:                                    # 它已经有 hooks；命令改指通用客户端即可
+  kind: claude-settings
+  config: "~/.claude/settings.json"
+  command: "{{pyw}} {{core}}/plugins/hook_client.py --agent claude-code"
+  client: "plugins/hook_client.py"
+
+source:
+  events: hook                           # 事件走 hook（PostToolUse 等）
+  transcript: session-store              # 它的会话在 ~/.claude/projects/**/*.jsonl（适配器还没写）
+  adapter: ""                            # ← 待补：claude_session（需要时再加）
+  path: "~/.claude/projects"
+
+notes:
+  - "~/.claude/settings.json 里已有一条 PostToolUse hook，命令指到 ~/.claude/logs/hook_log.py —— 那个脚本**不存在**，所以现在是条死 hook；add 会把它改成通用客户端。"

@@ -1,0 +1,107 @@
+# agents/_probe.yaml —— **可能有哪些 agent** 的候选表（只用于"自动识别"）
+#
+# 为什么单独一张表：识别要能认出**还没有描述文件**的 agent（辞玖：不仅是 dsh、codex 等等）。
+# 描述文件（agents/<id>.yaml）= 已确定要接入的；这张表 = "本机上可能装着谁"的候选与特征。
+# 命中但没有描述文件 → agentctl 会报"认到了，可以生成一份骨架描述文件"。
+#
+# markers：路径/可执行，任一命中即算装了（~、%ENV% 都认）
+# config_file（可选）：**MCP 配置到底是哪个文件** —— 一个 agent 目录里常有好几个 .toml/.json，
+#   不写的话"接入手工单"只能靠猜（2026-10-05：reasonix 就被猜成了 ~/.reasonix/config.toml，
+#   而真正的 MCP 表是 %APPDATA%/reasonix/config.toml）。
+# mcp：建议的接法（生成骨架时写进描述文件）
+# note：给人和给 agent 的一句话说明
+- id: claude-desktop
+  name: Claude Desktop
+  markers: ["%APPDATA%/Claude/claude_desktop_config.json"]
+  mcp: mcp-json
+  config_hint: "%APPDATA%/Claude/claude_desktop_config.json 的 mcpServers"
+  note: "桌面版；MCP 写在 claude_desktop_config.json 的 mcpServers。"
+- id: cursor
+  name: Cursor
+  markers: ["~/.cursor/mcp.json", "%APPDATA%/Cursor/User/settings.json"]
+  mcp: mcp-json
+  config_hint: "~/.cursor/mcp.json 的 mcpServers"
+  note: "编辑器；MCP 写在 ~/.cursor/mcp.json。"
+- id: windsurf
+  name: Windsurf
+  markers: ["~/.codeium/windsurf/mcp_config.json"]
+  mcp: mcp-json
+  config_hint: "~/.codeium/windsurf/mcp_config.json 的 mcpServers"
+  note: "编辑器；MCP 写在 mcp_config.json。"
+- id: cline
+  name: Cline（VS Code 扩展）
+  markers: ["%APPDATA%/Code/User/globalStorage/saoudrizwan.claude-dev"]
+  mcp: mcp-json
+  config_hint: "VS Code 扩展的 MCP 设置（cline_mcp_settings.json）"
+  note: "VS Code 里的扩展；MCP 在扩展自己的设置里。"
+- id: gemini-cli
+  name: Gemini CLI
+  markers: ["~/.gemini/settings.json"]
+  mcp: mcp-json
+  config_hint: "~/.gemini/settings.json 的 mcpServers"
+  note: "命令行 agent；MCP 写在 settings.json。"
+- id: continue
+  name: Continue
+  markers: ["~/.continue/config.json", "~/.continue/config.yaml"]
+  mcp: mcp-json
+  config_hint: "~/.continue/config.json 的 mcpServers"
+  note: "编辑器插件；MCP 写在 config.json。"
+- id: goose
+  name: Goose
+  markers: ["%APPDATA%/Block/goose/config.yaml", "~/.config/goose/config.yaml"]
+  mcp: mcp-json
+  config_hint: "goose 的 config.yaml（extensions）"
+  note: "Block 的本地 agent；扩展写在 config.yaml。"
+- id: zed
+  name: Zed
+  markers: ["%APPDATA%/Zed/settings.json", "~/.config/zed/settings.json"]
+  mcp: mcp-json
+  config_hint: "Zed settings.json 的 context_servers"
+  note: "编辑器；MCP 叫 context_servers。"
+- id: aider
+  name: Aider
+  markers: ["~/.aider.conf.yml", "~/.aider"]
+  mcp: none
+  config_hint: "（aider 没有 MCP 客户端）"
+  note: "命令行 agent，不支持 MCP —— 只能走 hook/文件方式，暂不建议接。"
+- id: opencode
+  name: opencode
+  markers: ["~/.config/opencode/opencode.json", "~/.opencode"]
+  mcp: mcp-json
+  config_hint: "~/.config/opencode/opencode.json 的 mcp"
+  note: "命令行 agent；MCP 写在 opencode.json。"
+
+# ── 2026-10-05 补：辞玖问「workbuddy、coze 为什么没识别到」 ──
+# 它们**装是装着**的（都在 D 盘绿色版），漏在"没进候选表 + 没有本地 MCP 配置文件"：
+# 模糊发现只认"像 MCP 配置的文件"，而这两家本地都没有这种文件（扣子的 MCP 在平台上配）。
+- id: coze
+  name: Coze（扣子）
+  markers: ["%APPDATA%/Coze", "%LOCALAPPDATA%/coze-updater", "~/Coze"]
+  mcp: mcp-json
+  config_hint: "没找到本地 MCP 配置文件（桌面版装在 D:\\coze）；扣子的 MCP 在平台上配"
+  note: "桌面版；自带 @coze/cli（0.3.3）但依赖不全跑不起来。要接得先确认有没有本地 MCP 配置或 hook。"
+- id: workbuddy
+  name: WorkBuddy（@genie）
+  markers: ["%APPDATA%/@genie/workbuddy-desktop", "%LOCALAPPDATA%/WorkBuddy", "~/WorkBuddy"]
+  mcp: mcp-json
+  config_hint: "它自己读写 mcp.json（含 mcpServers）；用户数据目录 %APPDATA%/@genie/workbuddy-desktop 现在是空的（还没配过 MCP）"
+  note: "Electron 版（装在 D:\\workbuddy），带 mcp-app-preload.js —— 是 MCP 客户端；工作区用 ~/WorkBuddy/<会话>/.workbuddy/memory/*.md 记东西。"
+- id: codebuddy
+  name: CodeBuddy（腾讯）
+  markers: ["%LOCALAPPDATA%/CodeBuddyExtension", "%APPDATA%/CodeBuddy"]
+  mcp: mcp-json
+  config_hint: "只找到 %LOCALAPPDATA%/CodeBuddyExtension/Data/Public/auth/*.info（登录信息），没找到 MCP 配置"
+  note: "与 WorkBuddy 同属 @genie 那一套；确认它的 MCP 配置位置再接入。"
+
+# ── 2026-10-05：reasonix 的**描述文件被清掉了**（辞玖要重新试一遍接入流程），
+#    但候选表里留着它 —— 这样控制台还会"认到它"，只是显示"认到但没描述文件"，
+#    可以直接点「📝 接入手工单」让 reasonix 自己再接一次。
+- id: reasonix
+  name: Reasonix
+  markers: ["%APPDATA%/reasonix", "%APPDATA%/reasonix/config.toml", "~/.reasonix/logs/hook_logger.py"]
+  # (4) 2026-10-05 订正：原来 markers 里有 ~/.reasonix/config.toml —— 它和 %APPDATA%/reasonix/config.toml
+  #   同名同形（都有 [[plugins]]），留着会把"该看哪个文件"带偏。MCP 表以 config_file 为准。
+  mcp: reasonix-toml
+  config_file: "%APPDATA%/reasonix/config.toml"
+  config_hint: "%APPDATA%/reasonix/config.toml 里的 [[plugins]]（原文注释：External MCP servers）"
+  note: "⚠️ 2026-10-05 订正：原来这里写它\"没有 MCP 客户端\"是**错的** —— 它的 [[plugins]] 就是外部 MCP 表（mimo-vision/obsidian/doubao-vision/supervisor 等十几条），接法用**它自己的 CLI**：reasonix-cli.exe mcp add brain -- …；事件面走 hook_logger.py（~/.reasonix/settings.json 里 5 条 hook）。"

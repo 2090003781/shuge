@@ -1,0 +1,57 @@
+# WorkBuddy（腾讯 @genie/workbuddy-desktop）—— agent 接入描述
+#
+# 路径不写死：`{{pyw}}` = 本机不弹黑窗的 python，`{{core}}` = 本平台装在哪
+# （写进你的配置时由 scripts/agentctl.py 按**本机识别结果**填；2026-10-06 辞玖定）
+#
+# 本机实探（2026-10-05，辞玖问「workbuddy 为什么没识别到」时挖出来的）：
+#   装在 D:\workbuddy（绿色版，Electron）；用户数据在 ~/.workbuddy —— 那是一整套 agent 工作区：
+#     IDENTITY.md / SOUL.md / USER.md / memory / sessions / projects / skills / plugins / connectors
+#   · MCP：~/.workbuddy/.mcp.json（形状就是 {"mcpServers": {...}}）；另有 connectors/<id>/mcp.json
+#     （里面是一堆远程 connector，默认 disabled）+ ~/.workbuddy/mcp-approvals.json（新服务要它点头）
+#   · hooks：~/.workbuddy/settings.json 里 hooks[] —— **历史上接过枢阁**，
+#     命令指到 reasonix\global-workspace\second-brain-kit\src\bridge\workbuddy_hook.py（现况待确认）
+#   · 自带插件系统（~/.workbuddy/plugins + marketplaces）——将来可以像 dsh-second-brain 那样做原生插件
+id: workbuddy
+name: WorkBuddy（腾讯）
+agent_id: agent.workbuddy
+plugin_id: plugin.workbuddy
+
+detect:                                  # 三个标记任一命中就算装了
+  paths: ["~/.workbuddy", "%APPDATA%/@genie/workbuddy-desktop", "%LOCALAPPDATA%/WorkBuddy"]
+  files: ["~/.workbuddy/.mcp.json", "~/.workbuddy/settings.json"]
+  exes: []
+
+interface:
+  status_tool: workbuddy.status
+  inbox: data/inbox/workbuddy
+  record: data/transcripts/agent.workbuddy
+  capabilities: [agent.bridge, chat, reasoning, tool-use]
+  agent_capabilities: [chat, reasoning, tool-use]
+  description: "WorkBuddy 接入通道：MCP 面给它软件操作；事件走它的 hooks（hooks 模板还没做）。"
+
+mcp:                                     # 它吃 {"mcpServers": {...}}（落在 ~/.workbuddy/.mcp.json）
+  kind: mcp-json
+  server_name: brain
+  transport: stdio
+  command: "{{pyw}}"   # pythonw：不弹黑窗（这些进程是它自己 spawn 的）
+  args: ["{{core}}/plugins/agent_plugin.py", "--agent", "workbuddy", "--mcp"]
+  cwd: "{{core}}"
+  config: "~/.workbuddy/.mcp.json"
+  entry_id: "mcpServers.brain"
+
+hook:                                    # 它有 hooks[]，但形态与我们现有模板不同 → 先不动
+  kind: none
+  config: "~/.workbuddy/settings.json"
+  command: ""
+  client: "plugins/hook_client.py"
+
+source:
+  events: none
+  transcript: none
+  adapter: ""
+  path: ""
+
+notes:
+  - "接入只会往 ~/.workbuddy/.mcp.json 的 mcpServers 里加一条 brain —— 别的地方不碰。"
+  - "加完可能要过 ~/.workbuddy/mcp-approvals.json 那道审批（在 App 里点一下同意），它才会真加载。"
+  - "历史上接过枢阁（settings.json 的 hooks 指到 second-brain-kit 的 workbuddy_hook.py）——要恢复事件上报得单独做 hook 模板。"

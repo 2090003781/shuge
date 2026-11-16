@@ -1,0 +1,284 @@
+"""把库的正文物化到"库文件夹"（辞玖 2026-09-22 定：`D:\\枢阁\\库`）。
+
+  python tools/materialize.py                 # 干跑：只报要写多少、有没有冲突
+  python tools/materialize.py --apply         # 真写（不覆盖"内容不同且更新"的目标文件，除非 --force）
+  python tools/materialize.py --verify        # 只核对：库文件夹与库内内容是否一致
+
+规则的三个要点（都跟后面的双向同步对齐）：
+
+① **落点去掉 `vault/` 这一层**：库内所有正文都在 `vault/…` 下（镜像根），库文件夹里不要这个包装 ——
+   `vault/项目/ai-notes/项目记录.md` → `库文件夹\\项目\\ai-notes\\项目记录.md`。
+   这样"库文件夹的根"就等同于"vault 的根"，双向同步按相对路径一一对应，不留翻译层。
+② **私密篇密文落盘**：库里 `enc_algo=aesgcm-v1` 的行，磁盘上写的就是**封存后的字节**（正文是密文，
+   内容密钥包在 sqlite 的 key_ref 里）。这样锁才有意义：锁定态下磁盘上也不是明文。
+③ **mtime 对齐来源**：磁盘那份若在 vault 里有对应文件，就用它的 mtime —— 一开始两边"谁新谁赢"
+   才有意义（否则全写成当下，冲突没法判）。
+
+清单落在库的 data 目录（不放库文件夹里，免得污染文件树）。
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import io
+import json
+import os
+import shutil
+import sys
+import time
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
+from db import Database, local_iso          # noqa: E402
+
+DEFAULT_TARGET = r"D:\枢阁\库"
+DEFAULT_VAULT = r"D:\个人数据\辞玖"
+MANIFEST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "data", "materialize-manifest.json")
+
+
+def sha(b: bytes) -> str:
+    return hashlib.sha256(b).hexdigest()
+
+
+def lib_rel(db, fid, row) -> str:
+    """库内 → 库文件夹里的相对路径（去掉 vault/ 这一层包装）"""
+    p = db.folder_path(row["folder_id"]) if row["folder_id"] else ""
+    parts = [x for x in p.split("/") if x]
+    if parts and parts[0] == "vault":          # 去包装：按段判断（p 正好是 "vault" 时也要去掉）
+        parts = parts[1:]
+    return "/".join(x for x in ("/".join(parts), row["name"]) if x)
+
+
+def raw_bytes(db, row) -> bytes:
+    """写进库文件夹的字节：私密行写**封存后的密文**，普通行写明文内容"""
+    if row["enc_algo"]:
+        if row["storage"] == "pool":
+            return (db.data_dir / "pool" / (row["storage_ref"] or "")).read_bytes()
+        return row["content"] or b""
+    return db.get_content(row["id"])
+
+
+def collect(db, vault_root, prefer_source=True):
+    """prefer_source=True（默认）：非私密篇**优先拿 vault 原件**当落盘内容（库文件夹 = 原件形态）。
+
+    因为库内正文是"按库规则转换过"的视图（`[[ ]]`→`@`），vault 是原件；
+    文件夹要跟 vault 双向同步，就得是原件，否则两边永远不同字节。
+    私密篇不适用（vault 那份是明文、库那份是密文，同步器本来就跳过它们）。
+
+    ⚠️ 2026-09-30 记一笔：**库文件夹里本来就并存两种形态** —— 镜像时代抄的原件（盘 == vault）
+    和 09-27 之后库自己 write_through 写的库视图（盘 == 库）。所以别拿单一基准去"验一致"，
+    `--verify` 现在做**三方判别**（见下）。
+    """
+    out = []
+    for row in db.conn.execute("SELECT * FROM files"):
+        rel = lib_rel(db, row["id"], row)
+        lib_data = raw_bytes(db, row)                 # 库内那份（私密=密文）
+        data = lib_data
+        vdata = None
+        src = os.path.join(vault_root, rel.replace("/", os.sep))
+        if os.path.isfile(src):
+            vdata = open(src, "rb").read()
+            mt = os.path.getmtime(src)
+            if prefer_source and not row["enc_algo"]:
+                data = vdata                            # 原件优先（见上面的说明）
+        else:
+            try:
+                mt = time.mktime(time.strptime(row["mtime"][:19], "%Y-%m-%dT%H:%M:%S"))
+            except Exception:
+                mt = time.time()
+        out.append({"rel": rel, "bytes": data, "hash": sha(data), "mtime": mt,
+                    "private": bool(row["enc_algo"]), "size": len(data),
+                    "lib_hash": sha(lib_data), "lib_size": len(lib_data),
+                    "vault_hash": (sha(vdata) if vdata is not None else ""),
+                    "from_vault": vdata is not None})
+    return out
+
+
+def write_one(target, item, force=False, backup_root="", shrink=2.0):
+    """写一个文件。三道闸：内容一样→只对齐时间；目标更新→不覆盖；**目标大得多→拒绝覆盖**。
+
+    最后一道是 2026-09-23 加的（辞玖报"整文件覆盖抹掉旧内容"）：把一份小的新版本盖到一份大的老版本上，
+    是丢历史最常见的形态。要硬来加 --force；覆盖前一律先备份。
+    """
+    dst = os.path.join(target, item["rel"].replace("/", os.sep))
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    if os.path.isfile(dst) and not force:
+        old = open(dst, "rb").read()
+        if sha(old) == item["hash"]:
+            os.utime(dst, (item["mtime"], item["mtime"]))
+            return "same"
+        if os.path.getmtime(dst) > item["mtime"]:
+            return "newer-on-disk"          # 目标更新 → 不覆盖（双向同步的"谁新谁赢"）
+        if shrink and len(old) > len(item["bytes"]) * shrink:
+            return "target-longer"          # 目标大得多 → 拒绝覆盖（真相保护）
+    if backup_root and os.path.isfile(dst):
+        try:
+            out = os.path.join(backup_root, time.strftime("%Y%m%d-%H%M%S"), "library",
+                               item["rel"].replace("/", os.sep))
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            shutil.copy2(dst, out)
+        except Exception:
+            pass
+    with open(dst, "wb") as f:
+        f.write(item["bytes"])
+    os.utime(dst, (item["mtime"], item["mtime"]))
+    return "written"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--target", default=DEFAULT_TARGET)
+    ap.add_argument("--vault", default=DEFAULT_VAULT)
+    ap.add_argument("--apply", action="store_true", help="真写（默认只干跑）")
+    ap.add_argument("--force", action="store_true", help="目标更新也覆盖")
+    ap.add_argument("--verify", action="store_true", help="只核对（不写）")
+    ap.add_argument("--write-missing", action="store_true",
+                    help="只补「库里有、文件夹里没有」的那几篇（**绝不覆盖已有文件**；"
+                         "导入漏落盘的场景用它，比 --apply 安全）")
+    ap.add_argument("--backup-root", default=r"D:\枢阁\.镜像备份",
+                    help="覆盖前把目标备份到这里（默认与镜像同步同一处）")
+    ap.add_argument("--prune", action="store_true",
+                    help="删掉库文件夹里「库里已经没有了」的文件（逐个打印，只碰非点开头项）")
+    ap.add_argument("--prefer", choices=("vault", "lib"), default="vault",
+                    help="落盘内容以谁为准：vault=原件优先（历史默认，为与已退役的 vault 双向同步）；"
+                         "lib=库视图优先（倒转用：库才是真相源）")
+    ap.add_argument("--strict-lib", action="store_true",
+                    help="--verify 时要求「盘 == 库」（转换后的视图口径）")
+    ap.add_argument("--strict-vault", action="store_true",
+                    help="--verify 时要求「盘 == vault 原件」（双向镜像时代的口径）")
+    a = ap.parse_args()
+
+    db = Database()
+    items = collect(db, a.vault, prefer_source=(a.prefer == "vault"))
+    priv = [x for x in items if x["private"]]
+    print("库内 %d 篇；其中私密（密文落盘）%d 篇；带 vault 对应文件的 %d 篇"
+          % (len(items), len(priv), sum(1 for x in items if x["from_vault"])))
+    print("总字节：%.2f MB（含密文）" % (sum(x["size"] for x in items) / 1048576.0))
+    print("目标文件夹：%s" % a.target)
+    print("落盘内容以谁为准：%s" % ("vault 原件" if a.prefer == "vault" else "库视图（倒转口径）"))
+
+    if a.write_missing:
+        n = 0
+        for x in items:
+            dst = os.path.join(a.target, x["rel"].replace("/", os.sep))
+            if os.path.isfile(dst):
+                continue
+            parent = os.path.dirname(dst)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with open(dst, "wb") as fh:
+                fh.write(x["bytes"])
+            os.utime(dst, (x["mtime"], x["mtime"]))
+            print("    补：%s（%d 字节）" % (x["rel"], x["size"]))
+            n += 1
+        print("补了 %d 篇「库里没有落盘」的（已有文件一个没碰）" % n)
+        db.close()
+        return 0
+
+    if a.verify:
+        # 三方判别（2026-09-30）：盘上那份要么是"库视图"，要么是"vault 原件"，两者都算正常；
+        # 都不是才是真漂移。以前拿单一基准比 → vault 基准报 12 条、库基准报 171 条，全是假的。
+        same_lib, same_vault, drift, miss = [], [], [], []
+        for x in items:
+            dst = os.path.join(a.target, x["rel"].replace("/", os.sep))
+            if not os.path.isfile(dst):
+                miss.append((x["rel"], "-", x["lib_size"]))
+                continue
+            h = sha(open(dst, "rb").read())
+            if h == x["lib_hash"]:
+                same_lib.append(x["rel"])                 # 盘 == 库（库自己写的投影）
+                continue
+            if x["vault_hash"] and h == x["vault_hash"]:
+                same_vault.append(x["rel"])               # 盘 == vault 原件（镜像时代抄的）
+                continue
+            drift.append((x["rel"], os.path.getsize(dst), x["lib_size"]))
+
+        print("核对（三方判别）：盘 == 库 %d ｜ 盘 == vault 原件 %d ｜ **真漂移 %d** ｜ 缺失 %d"
+              % (len(same_lib), len(same_vault), len(drift), len(miss)))
+        for label, rows in (("真漂移（盘既不等于库、也不等于 vault 原件）", drift),
+                            ("缺失（库里没有落盘）", miss)):
+            if not rows:
+                continue
+            print("  %s %d 条：" % (label, len(rows)))
+            for rel, on_disk, in_lib in rows[:25]:
+                print("    %-56s 盘 %-9s 库内 %-9s" % (rel[:56], on_disk, in_lib))
+            if len(rows) > 25:
+                print("    …（还有 %d 条）" % (len(rows) - 25))
+        bad = 0
+        if a.strict_lib:
+            bad = len(items) - len(same_lib)
+            print("  ［--strict-lib］要求「盘 == 库」→ 不满足 %d 条" % bad)
+        if a.strict_vault:
+            bad = len(items) - len(same_vault)
+            print("  ［--strict-vault］要求「盘 == vault 原件」→ 不满足 %d 条" % bad)
+        db.close()
+        if a.strict_lib or a.strict_vault:
+            return 1 if bad else 0
+        return 0 if (not drift and not miss) else 1
+
+    if not a.apply:
+        exist = sum(1 for x in items
+                    if os.path.isfile(os.path.join(a.target, x["rel"].replace("/", os.sep))))
+        print("干跑：目标已存在 %d 篇；加 --apply 才真写" % exist)
+        db.close()
+        return 0
+
+    if a.prune:
+        want = {x["rel"].replace("/", os.sep) for x in items}
+        removed = 0
+        for dirpath, dirnames, filenames in os.walk(a.target, topdown=False):
+            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+            for fn in filenames:
+                if fn.startswith("."):
+                    continue
+                # 私密文件夹的加密包**永远不许 prune**（2026-10-15）。
+                # 它按 `.` 开头本来就躲过了上面那条，但那是巧合 ——
+                # 包一旦被删，8 篇私密笔记的正文就没了（库里那份是另一份密文，
+                # 但 package 模式下包才是正文的家）。护栏要显式，不靠命名习惯。
+                try:
+                    import priv_folder as _pf
+                    if _pf.is_pack_file(fn):
+                        continue
+                except Exception:
+                    pass
+                full = os.path.join(dirpath, fn)
+                rel = os.path.relpath(full, a.target)
+                if rel not in want:
+                    os.remove(full)
+                    removed += 1
+                    print("  删（库里没有）：%s" % rel)
+            try:
+                # 目录里有加密包时不许收掉 —— rmdir 对非空目录本来就会失败，
+                # 但这里显式判一次：将来包若允许跟别的东西分开存，这条也不会误伤
+                try:
+                    import priv_folder as _pf2
+                    if os.path.isfile(os.path.join(dirpath, _pf2.PACK_NAME)):
+                        continue
+                except Exception:
+                    pass
+                os.rmdir(dirpath)            # 空目录顺手收掉
+            except OSError:
+                pass
+        print("清理：删了 %d 个多余文件" % removed)
+
+    stats = {"written": 0, "same": 0, "newer-on-disk": 0, "target-longer": 0}
+    t0 = time.time()
+    for x in items:
+        r = write_one(a.target, x, force=a.force, backup_root=a.backup_root)
+        stats[r] += 1
+        if r == "target-longer":
+            print("  跳过（目标大得多，拒绝覆盖）：%s" % x["rel"])
+    os.makedirs(os.path.dirname(MANIFEST), exist_ok=True)
+    with io.open(MANIFEST, "w", encoding="utf-8") as f:
+        json.dump({"at": local_iso(), "target": a.target, "vault": a.vault,
+                   "count": len(items), "private": len(priv),
+                   "items": [{"rel": x["rel"], "hash": x["hash"], "mtime": x["mtime"],
+                              "private": x["private"]} for x in items]}, f, ensure_ascii=False)
+    print("写入完成（%.1f 秒）：%s" % (time.time() - t0, stats))
+    print("清单：%s" % MANIFEST)
+    db.close()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

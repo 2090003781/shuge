@@ -1,0 +1,11 @@
+# 库的 .gitignore（2026-09-21 建）
+# 数据是"唯一真相源"，但它属于**运行时状态**，不进版本库（备份走 data/backups 与 snapshots）
+data/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+_smoke/
+# 模型权重与本地产物
+models/
+*.log
